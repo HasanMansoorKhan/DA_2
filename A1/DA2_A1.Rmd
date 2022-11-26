@@ -1,0 +1,236 @@
+---
+title: "DA_2 Assignment 1"
+author: "Hasan Mansoor Khan"
+date: "2022-11-26"
+output: pdf_document
+---
+
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### Data Analysis 2 - Assignment 1
+## Hasan Mansoor Khan
+## 26/11/2022
+
+### Overview
+
+The scope of my analysis pertains to a specific occupation group which is : General and operations managers. This is represented by occupational code 20. Considering Gender, Wages and the level of education completed, it is expected that a wage gap keeping in mind highest qualification earned can be witnessed. Using various regression models, my analysis will dive into the question regarding wage gaps and gender based on educational level achieved. Is the wage earned between males and females significantly different for General and operations managers and if so does it vary by educational qualification.
+
+
+Firstly, I create a df importing all observations of the cps earnings dataset. I then filter data for occupational code 20 (General and operations managers). I then consider specific observations such as those having bachelors education or more, those 21 or more. This brings my narrowed df (df_2) to 501 observations. Of these 501, roughly 35% are female that is 174.
+
+Secondly, a comparative analysis can be done by comparing differences in earnings by using the hourly wage rate for General and operations managers. Hence, filtering data  for relevant variables, I include the hourly wage rate and the log of hourly wage rate.
+
+### Analysis & Interpretation
+
+The first task is to identify the unconditional gender gap. For this purpose, it is imperative to overview the summary statistics which I done by using the data summary function. Then, I proceed to visualize using a histogram which shows a gap in wages between males and females in the narrowed data frame. A regression analysis of this can reveal further about the variation in wages and its magnitude. My goal is to perform the regression analysis and visualize it using a regression table and graphs.
+
+
+
+For the regression analysis lm robust function is used for the variables. These exhibits the correlation between the variables, its regression and application of weights using a predefined procedure that takes into account 'influential observations'. For the analysis, I do not exclude any extreme values as there is no immediate reason to do so as far as my analysis goes. Excluding Y values without proper reasion is not good practice. After running 4 regressions using log-level analysis. Log (log of hourly wages) & level (education). 
+ 
+
+The unconditional gender wage gap is illustarted by a histogram. The histogram shows ln of hour wages on the x axis and number of respondents on y axis. A clear pattern is illustrated where at higher hour wage rates there are more men than women. Further regression analysis will incorporate education and wage gap.
+
+
+## Regression 1:
+
+Assuming other factors remain unchanged and only wages and gender are considered, the first regression identifies that women earn 11.8 percent less than their male counterparts. This is depicted by the Coefficients in the regression. The intercept in regression one is at 3.5. The r square meanwhile stands at 0.013 which is value at the lower end. 
+
+
+## Regression 2:
+
+Regression 2, takes into account more factors in an attempt to secure a better R square  and include more variables. It includes regression for educational level bachelors, masters & phd. The combined for all 3 categories, shows that women earn approximately 12% less while the specific qualification can cause for different results. For example education level at bachelors shows that women earn 25% less, women with masters earn 10% less and women with PhDs actually earn 20% more than their male counterparts.
+
+## Regression 3:
+
+The third regression takes into account regressions by all educational categories including females with bachelors, masters, PhD's as well as professional. For females in general in the four categories, they tend to earn 18% less than their male general and operation managers. However, there is considerable difference between the specific categories. For example, those females with bachelors earn 24% less while those females with masters earn 13% less and PhDs earn 22% more! The r square for this model is 0.05 which again illustrates a low r square. This may be that factors other than gender are not taken into account.
+
+
+## Regression 4:
+
+The fourth regression model includes age as well as educational qualifications the r square for this regression model is 0.11 which higher than the previous r square. It is roughly twice as much. This model showed females earning 10% less on average while those with bachelors earned 20% less and those with masters earned 8% less. This model also shows that females with PhDs earned 17% more. The coffecient for age is at 1.2% which is relatively insignificant when compared to educational qualification. 
+
+
+## Conclusion:
+
+All 4 regression models, focus on the correlation between female qualification and their hourly wage. The various models focus on different educational qualifications and added varibales such as age. The R squares signify that they are generally low. However, they are higher in regression model 4. All 4 models show that on avergae women earn less than men. However, there is variation when their qualification is taken into account. The gender gap is highest at bachelor level and lowest at PhDs where gender gap is minimal. 
+
+
+```{r, include = FALSE}
+# Clear the environment
+rm(list=ls())
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+
+# Loading the relevant libraries 
+
+library(tidyverse)
+library(readr)
+library(estimatr)
+library(huxtable)
+library(dplyr)
+library(knitr)
+library(ggplot2)
+library(modelsummary)
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results='hide'}
+# Loading the Data and narrowing the scope of analysis with respect to occupation
+
+df <- read_csv("https://osf.io/4ay9x/download")
+
+# Check the first few rows of the data set
+
+head(df)
+
+# no. of women in the data set
+females_count_df <- count ( df [ which ( df$sex == 2 ) , ] ) 
+
+# 73,738 of 149,316 are women. This is approx 49% of observations
+
+# Selecting observations specific to my study:
+# Code for General and operations managers is 20
+# Education level is kept at bachelor & above using code for grade92 as 43 or more
+# Working hours are kept 20 and above
+# Weekly earnings are kept above 100
+# Age group is limited to 21 or above years of age
+
+
+df_2 <- df %>% filter ( occ2012 == 20, 
+                    grade92 >= 43, 
+                    uhours >= 20, 
+                    earnwke >= 100, 
+                    age >= 21 ) 
+
+
+
+# Women in the occupation group selected (General and operations managers, code 20) 
+
+females_count_df2 <- count (df_2[which(df_2$sex==2), ]) 
+
+## 174/501 females approximately 35%
+
+
+# Renaming and altering relevant variables for df_2 data set
+
+df_2 <- df_2 %>% mutate (female=as.numeric(sex==2)) %>%
+                 mutate (hour_wage = earnwke/uhours) %>%
+                 mutate (ln_hw = log (hour_wage)) %>% 
+                 mutate ( ed_bachelor=as.numeric(grade92==43),
+                          ed_master=as.numeric(grade92==44),
+                          ed_Professional = as.numeric(grade92==45),
+                          ed_PhD = as.numeric(grade92==46 ) )
+
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE, results='hide'}
+# The unconditional gender gap
+df_2 %>% dplyr::select(earnwke,uhours,hour_wage) %>% summary()
+tabulate(df_2$female)
+table(df_2$occ2012,df_2$female)
+
+# Re code male & female
+
+df_2 <- df_2 %>%  mutate(sex=recode_factor(sex,
+                                `1`="Male",
+                                `2`="Female"))
+```
+
+
+```{r, echo=FALSE, warning=FALSE, message=FALSE}
+# Summary statistics with hourly wages
+
+datasummary(sex*hour_wage ~ 
+               Mean + SD + Min + Max + N , data = df_2)
+
+# summary statistics with log wages
+
+datasummary(sex*ln_hw ~ 
+               Mean + SD + Min + Max + N , data = df_2)
+
+```
+
+
+```{r, echo=FALSE, fig.width= 7, fig.height= 3 }
+# Unconditional gender gap by hourly wages
+
+ggplot(df_2, aes(ln_hw, fill = sex)) + geom_histogram(alpha = 1, position = 'identity') +
+  labs (x = "Log Hourly Wage", y = "Number of Respondents")
+```
+
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results='hide'} 
+
+# log-level regressions
+
+# unconditional gender gap
+
+r_1 <- lm_robust(ln_hw ~ female, data = df_2, se_type = "HC1")
+
+summary(r_1)
+
+# With all education levels except 39-42. keep only bachelor and above
+
+r_2 <- lm_robust(ln_hw ~ female + ed_bachelor + ed_master  + ed_PhD, data = df_2, se_type = "HC1")
+
+summary(r_2)
+
+# with interactions between education degree and gender
+
+r_3 <- lm_robust(ln_hw ~ female + ed_bachelor + ed_master + ed_Professional + ed_PhD + female*ed_bachelor + female*ed_master + female*ed_Professional + female*ed_PhD, data = df_2, se_type = "HC1")
+
+summary(r_3)
+
+# adding age as an explanatory variable with education level
+
+r_4 <- lm_robust(ln_hw ~ female + age + ed_bachelor + ed_master + ed_Professional + ed_PhD, data = df_2, se_type = "HC1")
+
+summary(r_4)
+
+```
+
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE} 
+
+# Regression table for data analysis
+
+huxreg(r_1, r_2, r_3, r_4, statistics = c(N = "nobs", R2 = "r.squared"), stars = c(`****` = 0.001, `***` = 0.01, `**` = 0.05, `*` = 0.1 ),borders = 0.4, outer_borders = 0.8, number_format = "%.4f", align = ".")
+
+```
+
+
+```{r, echo=FALSE,message=FALSE, warning=FALSE, fig.width=7, fig.height=3}
+
+ggplot(data = df_2, aes(x = grade92, y = ln_hw , colour = sex )) + geom_point() + stat_smooth(method = 'loess', formula = y ~ x, size = 1) + theme(axis.text.x=element_text(angle = 0, vjust = 0.5)) + xlim(40,50) + 
+  labs( x = "Highest Degree Completed", y = "Log of Hourly Wages") +
+ scale_x_continuous(labels = c("ed_, ed_, ed_bachelor", "ed_master", "ed_Professional", "ed_PhD") )
+  
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, results='hide'}
+df_2 <- df_2 %>% mutate ( Degree = recode_factor(grade92,
+                                             `43` = "Bachelors",
+                                             `44` = "Masters",
+                                             `45` = "Professional",
+                                             `46` = "Doctorate")) 
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE, fig.width=7, fig.height=3  }
+# Education level of general & operation managers
+
+ggplot(df_2, aes(x=Degree, fill=Degree)) +
+  geom_histogram(stat="count") +
+  scale_fill_manual(values=c('darkgreen','brown', 'pink', 'blue'))
+```
+
+
+
