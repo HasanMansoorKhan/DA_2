@@ -1,0 +1,382 @@
+---
+title: "Car Sales Analysis & Regression Models"
+author: "Hasan Mansoor Khan"
+output:
+  pdf_document:
+      extra_dependencies: ["float"]
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+```{r echo = FALSE, message = FALSE, include = FALSE}
+#cleaning the environment
+rm(list=ls())
+
+#loading relevant libraries
+library(tidyverse)
+library(dplyr)
+#install.packages( "fastDummies" )
+library(fastDummies)
+library(data.table)
+library(lspline)
+library(huxtable)
+library(ggthemes)
+library(estimatr)
+library(kableExtra)
+library(modelsummary)
+library(DataExplorer)
+library(ggplot2)
+library(esquisse)
+```
+## Research Question
+
+The underlying question of this report is whether there is a significant relationship between the selling price of a vehicle and the kilometers it has been driven. Moreover, is the relationship defined by other variables such as its mileage in kilometers per liter, type of fuel it consumes?  
+
+
+## Introduction
+
+This term project is a regression analysis where my focus is on the selling price of used vehicles and the kilometers driven by each vehicle. Hence my dependent  variable is selling price while my explanatory variable is kms driven. The price is measured in Indian Rupees (1 USD = approx. 82.6 INR). Other key variables include the fuel type which can be petrol, diesel, CNG or LPG. Two variables act as control variables namely mileage & type of fuel. I initiate my analysis by first studying my observations for each variable and narrow my analysis by specifying which years I want to include. Moreover, I study distribution of the key variables such as kms driven. This enabled me to opt for transformation of variables so that my regression analysis shows whether a relationship can be established. If so, what exactly is the expected change in selling price when kilometers driven are increased. 
+
+### Motivation
+
+The used car market is an integral measure for car manufactures about how consumers perceive their products once their vehicles have been used for a couple of years. The used car market depends on a lot of characteristics that influence the selling price of a used vehicle. How much exactly does kilometers driven by a car impact its expected selling price. Compared to new vehicles, data  containing used  vehicles has substantially higher observations and hence a better fit may be expected. While keeping fuel type and mileage as control variables, I can study the impact of kilometers  driven on selling price.
+
+### Data
+
+I opted for a data set related to vehicle selling price and its features. I found the data set on Kaggle which included selling price for more than 7,900 vehicles. Such a high number of observations are because the data is for used cars and hence each observation is a unique car with different characteristics. The primary focus is on the kilometers driven by each car. Furthermore, the data contains 13 variables out  of which I focus on 6 main variables including fuel type, mileage in kilometer per liter, vehicle name and fuel type. Lastly, I focus on car models from year 2015 to 2020 inclusive. The data requires cleaning and changing data tyoes from characters to numeric. The data is imported from my github repository URL.  
+
+The Kaggle URL for the data set is as follows: (https://www.kaggle.com/datasets/nehalbirla/vehicle-dataset-from-cardekho?resource=download&select=Car+details+v3.csv).
+
+
+```{r echo = FALSE, message = FALSE, include = FALSE}
+
+# Reading CSV file from Github Repository URL
+df <- read.csv('https://raw.githubusercontent.com/HasanMansoorKhan/DA_2/main/Cars.csv')
+
+head(df)
+```
+## Exploratory Data Analysis
+
+### Understanding the data
+
+1. **model**:  Model refers to the name of the vehicle. It main includes the brand or company that made the car such Skoda and then the specific model type such as Rapid. The model variable may also include some basic feature such as engine displacement. Hence by just glancing at this column we can have an overall idea of which car we want to examine. An example of model is Skoda Rapid 1.5 TDI Ambition. 
+2. **year**: This refers to the year of manufacture of the vehicle. Hence, it is also the year  when the car was  brand new. This is an important variable as it defines how old the car actually is. For example a car can have been driven for many kilometers but be only one year old or vice versa. An example of year is 2017 which suggest that car was brand new in 2017. 
+3. **selling_price**: This is the dependent variable in the regression analysis. It is a number that states the selling price of the used vehicle in Indian Rupees. Hence, a higher number refers to an expensive used car. This variable will be the main area of interest as the report examine what the expected selling price is or how it changes with respect to kms driven. 
+4. **km_driven**: This is the main explanatory variable of the regression analysis. The kms driven variables shows how many kms the car has been driven. It is an important measure in the used cars segment and in most markets is considered to be more significant than the actual year in which the vehicle was produced.
+5. **fuel_type**: The  fuel type variable shows for each observation or used car which fuel it uses. In this data  set that is the used car can run on petrol, diesel, CNG or LPG. This variable is transformed it four binary variables.
+6. **mileage**: Mileage is measured in kilometers per liter. This shows how much a vehicle  can run on average on a single liter of fuel. It represents the fuel economoy of the vehicle.
+
+### Data Cleaning
+
+The first step I perform after importing the data is to clean it. I ensure that a new data set is created which is clean and ready for regression analysis. This data set is named car_sales. I begin with renaming columns I renamed the model column as name and fuel type column as fuel for simplifying the data for all readers. I then proceed by excluding NA values. This step allows for short listing the data for consistency. I then narrow my data by selecting the years 2015 to 2020, both years inclusive. Hence my analysis focuses on those 6 years. I  use the gsub funtion to clean my mileage variable and separate the kmpl and actual number. This way the mileage shows the number rather than alphanumeric combination. Lastly, I convert mileage to a numeric variable  for  the purpose of the analysis. Binary variables are also created for each of the four fuel types. *figure 1* shows that my data set has no missing or NA observations after cleaning. Furthermore, my data has a 20-80 split between discrete and continuous columns. With a narrowed and clean data set, a focused and consistent analysis can be performed and be used for regression models. 
+
+
+```{r echo = FALSE,  message = FALSE, include = FALSE}
+
+# Data Munging & Cleaning
+
+# Renaming Columns
+#df <- df %>%
+#  rename ( model = `name`,
+#           fuel_type = `fuel`)
+
+colnames(df)[colnames(df) == "model"] = "name"
+colnames(df)[colnames(df) == "fuel_type"] = "fuel"
+
+# Exclude NA Values         
+df <- na.omit(df)
+
+# Selecting Relevant Variables
+car_sales <- df[, c('name', 'year', 'selling_price', 'km_driven', 'fuel', 'mileage' )]
+
+
+# Narrow the data frame by year (2015-2020)
+car_sales <- car_sales[df$year >= 2015 & car_sales$year <= 2020,]
+
+# Separate unit from the number in mileage column
+car_sales$mileage <- gsub("[^0-9.-]", "", car_sales$mileage)
+
+# Check data types
+str( car_sales )
+
+# Change mileage to numeric type (from character)
+car_sales$mileage <- as.numeric(car_sales$mileage)
+
+
+# Round numbers  to 1 decimal place
+#car_sales <- car_sales %>% 
+ #mutate( across( mileage, ~ round( ., 1 ) ) )
+
+# Identify vehicle types by fuel consumed 
+table( car_sales$fuel )
+
+# Summary statistics for variables of interest
+summary( car_sales )
+
+# To include Binary variables for fuel type using fastDummies package 
+car_sales <- dummy_cols( car_sales, select_columns = 'fuel' )
+
+# Rename newly created dummy variables
+car_sales <-  
+  rename( car_sales,
+    "CNG" = `fuel_CNG`,
+    "diesel" = `fuel_Diesel`,
+    "LPG" = `fuel_LPG`,
+    "petrol" = `fuel_Petrol`)
+```
+
+```{r, include=FALSE}
+# Exploring the data (data overview)
+v1 <- plot_intro( car_sales, 
+           title ="Data Overview", 
+           ggtheme =theme_bw(),
+           theme_config=theme(legend.position="bottom" ) )
+
+# Check total number of observations
+count( unique( car_sales ) ) #3187
+```
+
+### Descriptive Statistics
+
+The summary statistics for the data  set show the mean, median and minimum/maxuimum values for each variable. The selling price shows that  there is a an extreme value at 10 million INR. However, I opted to not exclude the observation despite  the fact that it can be a measurement error. A repercussion of this decision is it can effect the slope coefficient. The average price is 934,418 INR, while the median is lower at 630,000 INR. Because the mean is greater than the median for selling price, it is safe to assume that  the distribution of the variables is skewed to the right. A higher average/mean might be attributed to some extent to the presence of an extreme value (high). As far as kilometers driven is concerned, the mean is 46,613 KMs, while the median is slightly lower at 40,000 KMs. This shows that the explanatory variables is realtively normally distributed as it is only slightly skewed. Hence, an important decision will be variable transformation. As far as fuel is concerned, a vast majority of cars run on either petrol or diesel with very  few  cars using CNG or LPG. 
+
+*table 1* shows the essential descriptive statistics for each of the four main variables. At a glance, it can be observed that for the year and mileage variables the distribution is relatively less skewed as  the mean and median are close. Moreover, they have a low standard deviation when compared to the selling price and kms driven. 
+
+```{r, echo = FALSE}
+# Descriptive Statistics for relevant variables
+P95 <- function(x){quantile(x,0.95,na.rm=T)}
+P05 <- function(x){quantile(x,0.05,na.rm=T)}
+t1 <- datasummary ( ( year ) +
+            ( mileage ) +
+            ( selling_price ) +
+            ( km_driven ) ~
+             Mean + Median + SD + Min + Max + P05 + P95 , 
+             data = car_sales ,
+             title = 'Descriptive statistics' ) %>% 
+      kable_styling ( latex_options = c ( "HOLD_position","scale_down" ) )
+
+t1
+```
+
+### Variables Distribution
+
+Before performing regression analysis, the distribution of variables must be examined and appropriately visualized. For this I begin with the dependent variable  selling price. AS expected, the selling price is highly skewed and needs to be transformed into a variable with a relatively normal distribution. For this purpose, I opt to take the log of selling price and as a result get a relatively normally distributed variable. The main explanatory variable, km driven also has  a skewed distribution and hence the log of km driven is taking resulting in a comparatively  normal distribution. 
+
+```{r, echo = FALSE, include=FALSE}
+# Distribution of variables
+
+# 1. Price Variable
+dist1 <- ggplot( data = car_sales, aes( x = selling_price ) ) + 
+      geom_density( colour="red" ) 
+
+# 2. Transforming Price to ln(price) because price is right skewed
+dist2 <- ggplot( data = car_sales, aes(x = log(selling_price ) ) ) + 
+      geom_density( colour="red" )
+  
+# 3. KM driven variable
+dist3 <- ggplot( data = car_sales, aes(x = km_driven )) + 
+      geom_density( colour="darkcyan" ) 
+
+# 4 Transform km driven to ln(km_driven)
+dist4 <- ggplot( data = car_sales, aes( x = log(km_driven) ) ) + 
+      geom_density( colour="darkcyan" )
+
+# Log transformed variables for better distribution (closer to normal)
+
+# ln(selling_price) 
+car_sales$ln_price <- log( car_sales$selling_price )
+
+# ln(kms)
+car_sales$ln_kms <- log( car_sales$km_driven )
+
+#  Opted not to transform mileage or year variableas its distribution was NOT skewed
+```
+
+### Correlation of multiple variables
+
+An important measure to see multiple correlations is visualize via a correlation matrix. This allows for visualizing whether the independent variables are correlated. The correlation heat map shows the correlation magnitude between the numerical variables of interest. The selling price and kms driven have a negative correlation as seen in the heat map correlation matrix. As far as fuel type is concerned,CNG and LPG show a near zero correlation with price while petrol and diesel showing positive correlation. However, diesel fuel shows a  relatively higher correlation with selling price. Multiple correlations of the variables give an idea of the impact of each variable to the other. 
+
+
+
+```{r, , echo = FALSE, include=FALSE}
+
+corr_df <- subset(car_sales,select =c(ln_price,ln_kms,mileage, CNG, diesel, LPG, petrol))
+
+cT <- round( cor( corr_df , use = "complete.obs") , 2 )
+# Visualize using triangular matrix
+cT[ upper.tri( cT ) ] <- NA 
+# convert to tibble format
+melted_cormat <- melt( cT , na.rm = TRUE)
+# Heat map
+ cor_matrix <- ggplot( data = melted_cormat, aes( Var2 , Var1 , fill = value ) )+
+  geom_tile( color = "white" ) +
+  scale_fill_gradient2(low = "lightblue", high = "deepskyblue", mid = "white", 
+                       midpoint = 0, limit = c(-1,1), space = "Lab", 
+                       name="Correlation") +
+  theme( axis.text.x = element_text(angle = 45, vjust = 1, 
+                                    size = 10, hjust = 1 ) )+
+  labs( y="",x="" )+
+  coord_fixed()+
+  theme(plot.title = element_text( hjust = 0.5 ) )+
+  ggtitle( "Corelation Matrix" ) 
+   
+cor_matrix
+
+```
+
+## Non-Parametric Regressions
+
+The first form of regression I use for the data analysis is non parametric regression. This is not defined by a specific function but is dictated by the data itself. I opted for the lowess method for non parametric regressions. This allows me to uncover the  association between selling price and the explanatory variable kms driven. I regress the dependent variable selling price on log of kilometers driven, kilometers driven and mileage. The results are  visualized in *figures 7-9*. *Figure 7* shows the non parametric regression between selling price of the used vehicle & the log of kms driven. The lowess shows a negative correlation just like *figure 8* where the x variable is kms instead of log of kms driven. As far as mileage is concerned, *figure 10* shows that there is a knot at approximately 20 kilometers per liter and the graph changes  coefficient from negative to positive. This can be interpreted as follows: the selling price of a used vehicle is expected to drop from 0 kmpl to 20 kmpl & increase from 20 kmpl to 40 kmpl.  
+
+
+
+```{r, echo = FALSE, include=FALSE}
+# Applying Regression Models 
+# log-log lowess- ln_price(y) and ln_kms(x)
+# Non-parametric regression for kms driven & selling price using transformed variables
+np1 <- ggplot( data = car_sales, aes( x = ln_kms , y = ln_price ) ) +
+  geom_point() +
+  labs( x = "ln_kms",y = "ln_price" ) +
+  geom_smooth( method='loess', colour = "blue" ) + 
+  ggtitle( "Log KMs driven VS Log price" ) +
+  theme(plot.title = element_text( hjust = 0.5 ) )
+
+# log-level lowess- ln_price(y)  and km_driven(x)
+np2 <- ggplot( data = car_sales, aes(x = km_driven, y = ln_price ) ) +
+  geom_point() +
+  labs( x = "km_driven",y = "ln_price" ) + 
+  geom_smooth( method="loess", colour = "blue" ) + 
+  ggtitle( "KMs driven VS Log Price" ) +
+  theme( plot.title = element_text(hjust = 0.5 ) )
+
+# log-level lowess- ln_prices(y) and mileage(x)
+np3 <- ggplot( data = car_sales, aes( x = mileage , y = ln_price) ) +
+  geom_point() +
+  labs(x = "mileage",y = "ln_price" ) + 
+  geom_smooth( method="loess", colour = "blue" ) + 
+  ggtitle( "mileage VS Log Price" ) +
+  theme( plot.title = element_text( hjust = 0.5 ) ) 
+
+```
+
+## Parametric Regressions
+
+As far as parametric regression is concerned, I opted for robust regression models as *table 1* shows some extreme values in selling price which is the dependent variable and being cautious these were not dropped. The extreme values can be meaningful as far as selling price is concerned. The four models each have different explanatory variables and are defined by different funtions as shown below for model mileage explanatory variable has a knot at 20 kmpl. While in model 3, lpg  fuel type acts as a reference binary variable. Lastly, im model 4, the interaction ofln(price)  & milage & its coefficient is considered. All 4 models and their funtions are explained  below.
+
+
+### Regression Models
+$$ln(price):=\beta_0+\beta_1ln(kms-driven) $$
+1. **Model_1**: shows relative change in ln(selling_price) with a change in ln(kms_driven). This model shows a log-log regression implying a percentage increase in explanatory variable kms_driven corresponds to a percentage increase in selling price. A null hypothesis can be assumed that is no significant relationship and the coefficient of the slope will be zero. Hence, the alternative hypothesis is that the coefficient is not zero and there is a  relationship between the two variables.  The model shows a coefficient of -0.16 which allows us to reject the null hypothesis. Moreover, the intercept at 15.1 is not useful as the dependent variable is log of selling price. Moreover, at zero kms driven, the car is brand new and not subject to analysis as the data is limited to prices of used cars. The r square of this simple linear regression is 0.047 which will show the fitness of the model when compared to other regression models performed. 
+
+$$ln(price):=\beta_0+\beta_1ln(mileage<20)+\beta_2ln(mileage>20) $$
+2. **Model_2**: Model 2 regresses price on mileage rather than kms driven. This explanatory variable has a knot at 20 kmpl and hence it incorporates piece wise linear spline at 20 kmpl. The two coefficents are approximately -0.13  and 0. This suggests that prices fall on average when kmpl is increased in the range 0-20 kmpl. However,in the 20-40 kmpl range, the coefficient is positive but near  zero suggesting a very minute increase in selling price can be expected when mileage is increased by one unit in the 20-40 kmpl range. The r  square for this model is at 0.214 showing a better fit comapred to model 1. 
+
+
+
+$$ln(price):=\beta_0+\beta_1ln(kms-driven)+\beta_2(mileage)+\beta_3(petrol)+\beta_4(diesel)+\beta_5(cng) $$
+3. **Model_3**: Model 3 adds dummy binary variables for each of fuel types. However, I keep lpg fuel type as the reference variable in this case. This model generates a slope and 5 coefficients. The coefficeients for ln(kms driven) is -0.26 suggesting a 26% reduction in selling price with one percent addition in kms driven. The slope coefficient for mileage is also negative at approx. -0-067 while petrol, diesel and  CNG have positive coefficients 0.423, 1.17 and 0.53 respectively. Lastly, the  intercept is 16.76 suggesting that when all considered explanatory variables are assumed zero, the log of selling price is 16.76, which is not a useful interpretation. However, with the control variables mileage and fuel type, a significant relationship can be seen between log of price and log  of kms driven. The r square for this model is approximately 0.436 suggesting a much better fit than the previous two models.
+
+
+$$ln(price):=\beta_0+\beta_1ln(kms-driven)+\beta_2(mileage)+\beta_3(petrol)+\beta_4(diesel)+\beta_5(mileage*ln(price)) $$
+4. **Model_4**: The final and fourth model, takes into account the interaction of mileage and price. This model also has 5 coefficients with ln_kms having a -0-03 coefficient. This suggest when all other explanatory variables are kept unchanged and kms driven alone is increased by one unit, the selling price is expected to drop 3% on average when kilometers driven is increased by one unit. This model manages to incorporate both fuel types as well as the interaction of mileage and price whicn has a  coefficient of 0.048. This model manages an r squared of 0.965 which by far the highest in all models. This is primarly due to the consideration of the interaction variable along with fuel types petrol and diesel which account for the greatest number of observations in the dataset as opposed to CNG and LPG fuel types. 
+
+
+```{r, echo = FALSE, include=FALSE}
+# Simple linear regression regressing ln_price on ln_kms
+reg1 <- lm_robust( ln_price ~ ln_kms, data = car_sales, se_type = "HC1" )
+
+summary( reg1 )
+
+# Piecewise linear regression regressing ln_KMs on mileage as explanatory variables
+reg2 <- lm_robust(  ln_price ~ ln_kms + lspline( mileage,20 ) , data = car_sales, se_type = "HC1"  )
+
+summary( reg2 )
+
+# Multiple linear regression regressing ln_kms, mileage & fuel_type(only petrol and diesel) as explanatory variables
+reg3 <- lm_robust(  ln_price ~ ln_kms + mileage + petrol +  diesel + CNG,  data = car_sales)
+
+summary( reg3 )
+
+#interaction term between mileage and ln_price
+reg4 <- lm_robust( ln_price ~ ln_kms + mileage + petrol + diesel + mileage*ln_price, data = car_sales, se_type = "HC1" )
+
+summary( reg4 )
+
+#combining regression models for the table
+car_regs <- huxreg( "Model_1" = reg1, "Model_2" =reg2, "Model_3" =reg3, "Model_4" =reg4, statistics = c( N="nobs", R2 = "r.squared" ),stars = c( `****` = 0.001, `***` = 0.01, `**` = 0.05, `*` = 0.1 ),borders = 0.4, outer_borders = 0.8, number_format = "%.3f", align = ".")
+                                                                                                  
+#format table, add title & color
+car_regs <- car_regs %>% 
+      map_background_color( -1, -1, by_regex(
+        "\\*" = "lightblue" ) ) %>% 
+      set_italic( final( 1 ), 1 ) %>% 
+      set_caption( "Regression table of Cars Price Regression Models" )
+
+car_regs
+```
+### External Validity
+
+External Validity is a key component of the analysis as it shows if the results are representative of the general pattern. In this case, the data was filtered to include used vehicles built in 2015 to 2016. This regression is performed for selling price in Indian Rupees (INR) and hence can be used for different used vehicles within India. However, the external validity is low for global markets of used cars as the various control variables are kept in mind keeping the Indian market. Moreover, the years also confound the results to used cars that were brand new in 2015 to 2020 and the findings cannot be applied to different years.
+
+
+## Conclusion
+
+To conclude, a relationship can be visualized between the selling price and the kms driven of a used vehicle. All four models with different r squares all suggest that the two variables are negatively correlated. Hence, on average on can expect the selling price to fall as kms driven by the used vehicle is increased. However, the extent of the drop varies according  to all models due to the presence of other influencing factors. However, even when control variables such as mileage and fuel type are added the negative correlation persists between selling price and kms driven. Finally, it is safe to say that despite the negative correlation, a causality can not be assumed rather an expectation of price reduction due to increase of kilometers driven is witnessed.
+
+\newpage
+### **APPENDIX**
+
+**Figure 1 - Data Overview**
+```{r, echo=FALSE,fig.height=3, fig.width=6, fig.align='center'}
+v1
+```
+
+**Figure 2- Correlation Heat Map**
+```{r, echo=FALSE,fig.height=5, fig.width=7,  fig.align='center' }
+cor_matrix
+```
+
+\newpage
+**Figure 3 - Distribution of Selling Price**
+```{r, echo=FALSE, fig.height=2, fig.width=8, fig.align='left'}
+dist1
+```
+
+**Figure 4 - Distribution of ln(selling price)**
+```{r, echo=FALSE,fig.height=2, fig.width=8,  fig.align='right'}
+dist2
+```
+**Figure 5 - Distribution of kilometers driven explanatory variable**
+```{r, echo=FALSE,fig.height=2, fig.width=8,  fig.align='right'}
+dist3
+```
+
+**Figure 6 - Distribution of  ln(kilometers driven) explanatory variable**
+```{r, echo=FALSE,fig.height=2, fig.width=8,  fig.align='right'}
+dist4
+```
+
+\newpage
+**Figure 7 - Lowess Regression with scatter plot - ln(selling price) & ln(kilometers driven)**
+```{r, echo=FALSE,fig.height=2, fig.width=8,  fig.align='right'}
+np1
+```
+
+**Figure 8 - Lowess Regression with scatter plot - ln(selling price) & kilometers driven**
+```{r, echo=FALSE,fig.height=2, fig.width=8,  fig.align='center'}
+np2
+```
+
+**Figure 9 - Lowess Regression with scatter plot - ln(selling price) & mileage**
+```{r, echo=FALSE,fig.height=2, fig.width=8,  fig.align='center'}
+np3
+```
+
+\newpage
+**Figure 10 -Regression table for 4 parametric regression models**
+```{r, echo=FALSE,  fig.align='center'}
+# Regression table for 4 parametric regression models
+car_regs
+```
